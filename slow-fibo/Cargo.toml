@@ -1,0 +1,25 @@
+[package]
+name = "slow-fibo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eyre = "0.6"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "registry"] }
+# The Console UI Visualizer
+tracing-forest = "0.1" 
+# The OTel Backend (Optional, keeping it for compatibility)
+tracing-opentelemetry = "0.22"
+opentelemetry = { version = "0.21", features = ["trace"] }
+opentelemetry_sdk = { version = "0.21", features = ["rt-tokio"] }
+opentelemetry-otlp = "0.14"
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+validator = { version = "0.16", features = ["derive"] }
+schemars = "0.8"
+tokio = { version = "1", features = ["full"] }
+
+[dev-dependencies]
+test-log = { version = "0.2", features = ["trace"] }

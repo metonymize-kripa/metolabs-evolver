@@ -1,0 +1,23 @@
+# List available commands
+default:
+    @just --list
+
+# Run the full CI pipeline (Formatting -> Linting -> Testing)
+ci: fmt clippy test
+    @echo "✅ Local CI Passed!"
+
+# Check formatting (Don't fix, just check like CI does)
+fmt:
+    cargo fmt -- --check
+
+# Check lints (Deny warnings like CI does)
+clippy:
+    cargo clippy -- -D warnings
+
+# Run tests
+test:
+    cargo nextest run
+
+# Run the app with telemetry trace
+run:
+    cargo run
