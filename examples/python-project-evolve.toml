@@ -1,0 +1,15 @@
+# Example Evolve.toml for Python Project
+
+[evolution]
+instruction = """
+Create a simple calculator module with add, subtract, multiply, and divide functions.
+Include comprehensive unit tests using pytest.
+"""
+
+test_command = "pytest tests/ -v"
+max_generations = 5
+files = ["src/calculator.py", "tests/test_calculator.py"]
+project_type = "python"
+file_extension = ".py"
+scaffold_content = "# TODO: Implement\n"
+primary_file = "src/calculator.py"

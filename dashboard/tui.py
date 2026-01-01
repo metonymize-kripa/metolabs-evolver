@@ -10,11 +10,28 @@ from rich.syntax import Syntax
 class CodeWindow(Static):
     """Display code with syntax highlighting."""
     def show_code(self, code, gen_id, filename):
-        lexer = "rust" if filename.endswith(".rs") else "python"
-        if filename.endswith("toml"): lexer = "toml"
+        # Lexer detection for Rust, Python, and common config formats
+        lexer = self._detect_lexer(filename)
         
         self.update(Syntax(code, lexer, theme="monokai", line_numbers=True, word_wrap=True))
         self.parent.border_title = f"{filename} ({gen_id})"
+    
+    def _detect_lexer(self, filename: str) -> str:
+        """Detect the appropriate lexer based on file extension."""
+        if filename.endswith(".rs"):
+            return "rust"
+        elif filename.endswith(".py"):
+            return "python"
+        elif filename.endswith((".toml", ".tml")):
+            return "toml"
+        elif filename.endswith((".yaml", ".yml")):
+            return "yaml"
+        elif filename.endswith(".json"):
+            return "json"
+        elif filename.endswith((".md", ".markdown")):
+            return "markdown"
+        else:
+            return "text"  # Fallback for unknown types
 
 class GenerationItem(ListItem):
     """A selectable item representing a generation."""
@@ -68,15 +85,16 @@ class EvolutionApp(App):
                 # Extract file list
                 self.files_list = data.get("evolution", {}).get("files", [])
                 
-                if self.files_list:
-                    # SMART SELECTOR: Prefer the first Rust file found
-                    rust_files = [f for f in self.files_list if f.endswith(".rs")]
-                    
-                    if rust_files:
-                        self.primary_file = rust_files[0]
-                    else:
-                        self.primary_file = self.files_list[0]
-                    
+                # Check for explicit primary_file setting
+                explicit_primary = data.get("evolution", {}).get("primary_file")
+                
+                if explicit_primary:
+                    # Use the explicitly specified primary file
+                    self.primary_file = explicit_primary
+                    self.notify(f"Config loaded. Tracking: {self.primary_file} (explicit)")
+                elif self.files_list:
+                    # Use the first file in the list (no language preference)
+                    self.primary_file = self.files_list[0]
                     self.notify(f"Config loaded. Tracking: {self.primary_file}")
                 else:
                     self.notify("Evolve.toml has no 'files' list!", severity="warning")
