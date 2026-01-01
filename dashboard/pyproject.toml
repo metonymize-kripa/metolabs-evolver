@@ -1,0 +1,11 @@
+[project]
+name = "dashboard"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "gitpython>=3.1.45",
+    "rich>=14.2.0",
+    "textual>=6.11.0",
+]
