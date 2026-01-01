@@ -1,9 +1,13 @@
-use slow_fibo::add;
+use slow_fibo::{add, fibonacci};
 
-#[test_log::test]
-fn test_basic_math() {
-    tracing::info!("Running integration test...");
-    let result = add(2, 2);
-    assert_eq!(result, 4);
-    tracing::info!("Math still works!");
+#[test]
+fn test_fibonacci_integration() {
+    // Test that fibonacci function works correctly
+    assert_eq!(fibonacci(10), 55);
+    assert_eq!(fibonacci(8), 21);
+}
+
+#[test]
+fn test_add_integration() {
+    assert_eq!(add(5, 7), 12);
 }

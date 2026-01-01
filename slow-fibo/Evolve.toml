@@ -1,0 +1,10 @@
+[evolution]
+instruction = """
+Implement a fibonacci function that calculates fibonacci numbers.
+The function should be well-tested and handle edge cases.
+"""
+
+test_command = "cargo test"
+max_generations = 5
+files = ["src/lib.rs", "tests/integration_test.rs"]
+project_type = "rust"
