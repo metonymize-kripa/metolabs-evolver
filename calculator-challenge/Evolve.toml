@@ -1,0 +1,35 @@
+[evolution]
+instruction = """
+Create a comprehensive calculator library with the following requirements:
+
+FUNCTIONALITY:
+1. Basic arithmetic operations (add, subtract, multiply, divide)
+2. Division must handle division by zero gracefully with Result<f64, String>
+3. Support for chaining operations (e.g., Calculator::new().add(5).multiply(2).result())
+4. Memory functions (store, recall, clear)
+5. Percentage calculations
+
+ERROR HANDLING:
+- All operations that can fail must return Result types
+- Provide clear, descriptive error messages
+- Handle edge cases: NaN, infinity, overflow
+
+CODE QUALITY:
+- Full documentation with examples for all public APIs
+- Follow Rust best practices (no unwrap in production code)
+- Implement Display trait for user-friendly output
+- Use builder pattern for operation chaining
+
+TESTING REQUIREMENTS:
+- Test all basic operations with normal inputs
+- Test edge cases: zero, negative numbers, very large numbers
+- Test error conditions: division by zero, invalid operations
+- Test operation chaining
+- Test memory functions
+- Aim for >90% code coverage
+"""
+
+test_command = "cargo test"
+max_generations = 10
+files = ["src/lib.rs", "tests/calculator_tests.rs"]
+project_type = "rust"
