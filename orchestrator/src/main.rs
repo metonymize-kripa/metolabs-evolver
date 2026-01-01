@@ -270,7 +270,7 @@ fn revert_to_snapshot(target_dir: &str, sha: &str) -> Result<()> {
     Ok(())
 }
 
-// --- CORE AGENT LOGIC (UPDATED FOR TDD) ---
+// --- CORE AGENT LOGIC (ENHANCED WITH CONTEXT-AWARE PROMPTS) ---
 
 #[instrument]
 fn run_agent_mutation(
@@ -285,20 +285,8 @@ fn run_agent_mutation(
         architect_model, editor_model
     );
 
-    // TDD ENFORCEMENT PROTOCOL
-    // We wrap the user's instruction with a strict TDD mandate.
-    let tdd_instruction = format!(
-        "IMPORTANT: You are an expert Engineer practicing strict Test-Driven Development (TDD).\n\
-        PROTOCOL:\n\
-        1. FIRST: Create or update the test file to reflect the requirements. Assertions must fail initially.\n\
-        2. SECOND: Implement the minimum code necessary to pass the new tests.\n\
-        3. THIRD: Refactor if needed while keeping tests green.\n\
-        4. Do NOT delete existing valid tests.\n\
-        \n\
-        TASK:\n\
-        {}",
-        instruction
-    );
+    // Build enhanced, context-aware prompt
+    let enhanced_prompt = build_enhanced_prompt(target_dir, instruction, files)?;
 
     let abs_path = std::fs::canonicalize(target_dir)
         .context("Failed to resolve absolute path of target_dir")?;
@@ -310,7 +298,7 @@ fn run_agent_mutation(
         .arg("--editor-model")
         .arg(editor_model)
         .arg("--message")
-        .arg(tdd_instruction) // Use the TDD wrapper
+        .arg(enhanced_prompt)
         .arg("--yes");
 
     for file in files {
@@ -322,6 +310,170 @@ fn run_agent_mutation(
         anyhow::bail!("Aider failed.");
     }
     Ok(())
+}
+
+/// Build an enhanced, context-aware prompt for the AI agent
+fn build_enhanced_prompt(target_dir: &str, instruction: &str, files: &[String]) -> Result<String> {
+    // Detect project type from files
+    let project_type = infer_project_type(files).unwrap_or("rust");
+
+    // Get project name from directory
+    let project_name = Path::new(target_dir)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("project");
+
+    // Load test command from config if available
+    let config_path = Path::new(target_dir).join("Evolve.toml");
+    let test_command = if config_path.exists() {
+        fs::read_to_string(&config_path)
+            .ok()
+            .and_then(|content| {
+                content
+                    .lines()
+                    .find(|line| line.starts_with("test_command"))
+                    .and_then(|line| line.split('=').nth(1))
+                    .map(|s| s.trim().trim_matches('"').to_string())
+            })
+            .unwrap_or_else(|| default_test_command(project_type))
+    } else {
+        default_test_command(project_type)
+    };
+
+    // Build the enhanced prompt
+    let mut prompt = String::new();
+
+    // ROLE & CONTEXT
+    prompt.push_str(&format!(
+        "ROLE & CONTEXT:\n\
+        You are an expert {} engineer working on the '{}' project.\n\
+        Current files being evolved:\n",
+        language_name(project_type),
+        project_name
+    ));
+
+    for file in files {
+        let file_type = if file.contains("test") {
+            "test code"
+        } else {
+            "library code"
+        };
+        prompt.push_str(&format!("- {} ({})\n", file, file_type));
+    }
+
+    prompt.push_str(&format!("Test command: {}\n\n", test_command));
+
+    // CODE QUALITY REQUIREMENTS
+    prompt.push_str("CODE QUALITY REQUIREMENTS:\n");
+    prompt.push_str(&get_code_quality_requirements(project_type));
+    prompt.push_str("\n");
+
+    // TEST QUALITY REQUIREMENTS
+    prompt.push_str("TEST QUALITY REQUIREMENTS:\n");
+    prompt.push_str(&get_test_quality_requirements(project_type));
+    prompt.push_str("\n");
+
+    // TDD PROTOCOL
+    prompt.push_str(&format!(
+        "TDD PROTOCOL:\n\
+        1. ANALYZE: Review existing code structure in the tracked files\n\
+        2. TEST FIRST: Write comprehensive failing tests that cover:\n\
+           - Happy path scenarios (normal, expected usage)\n\
+           - Edge cases and boundary conditions (empty inputs, zero, negative numbers, etc.)\n\
+           - Error handling (invalid inputs, resource failures)\n\
+        3. IMPLEMENT: Write minimal, clean code to pass all tests\n\
+        4. REFACTOR: Improve code quality while keeping tests green\n\
+        5. VERIFY: Ensure all tests pass with `{}`\n\n",
+        test_command
+    ));
+
+    // TASK
+    prompt.push_str(&format!("TASK:\n{}\n\n", instruction));
+
+    // CONSTRAINTS
+    prompt.push_str(
+        "CONSTRAINTS:\n\
+        - Do NOT delete existing valid tests\n\
+        - Maintain backward compatibility with existing code\n\
+        - Follow the project's existing code style and conventions\n\
+        - Write production-quality code, not just code that passes tests\n",
+    );
+
+    Ok(prompt)
+}
+
+/// Get language name for display
+fn language_name(project_type: &str) -> &str {
+    match project_type {
+        "rust" => "Rust",
+        "python" => "Python",
+        _ => "Software",
+    }
+}
+
+/// Get default test command for a project type
+fn default_test_command(project_type: &str) -> String {
+    match project_type {
+        "rust" => "cargo test".to_string(),
+        "python" => "pytest".to_string(),
+        _ => "cargo test".to_string(),
+    }
+}
+
+/// Get code quality requirements specific to the language
+fn get_code_quality_requirements(project_type: &str) -> String {
+    match project_type {
+        "rust" => "- Write idiomatic Rust code with proper error handling using Result<T, E>\n\
+            - Follow Rust naming conventions (snake_case for functions, CamelCase for types)\n\
+            - Add documentation comments (///) for public APIs\n\
+            - Ensure code compiles without warnings\n\
+            - Use appropriate ownership and borrowing patterns\n\
+            - Leverage the type system for safety (avoid unwrap() in production code)\n"
+            .to_string(),
+        "python" => "- Write idiomatic Python code following PEP 8 style guidelines\n\
+            - Add type hints for function signatures\n\
+            - Include docstrings for modules, classes, and functions\n\
+            - Use appropriate error handling with try/except blocks\n\
+            - Follow Python naming conventions (snake_case for functions, PascalCase for classes)\n\
+            - Ensure code passes linting (no unused imports, proper formatting)\n"
+            .to_string(),
+        _ => "- Write clean, maintainable code\n- Follow language best practices\n".to_string(),
+    }
+}
+
+/// Get test quality requirements specific to the language
+fn get_test_quality_requirements(project_type: &str) -> String {
+    match project_type {
+        "rust" => "- Write comprehensive tests covering edge cases:\n\
+              * Base cases (e.g., 0, 1 for recursive functions)\n\
+              * Boundary values (empty collections, max/min values)\n\
+              * Error conditions (invalid inputs)\n\
+            - Use descriptive test names that explain what is being tested:\n\
+              * Good: test_fibonacci_returns_zero_for_input_zero\n\
+              * Bad: test1, test_fib\n\
+            - Group related tests in test modules using mod tests { ... }\n\
+            - Use #[should_panic] or Result<()> for tests expecting errors\n\
+            - Consider property-based testing with proptest for complex logic\n\
+            - Test both success and failure paths\n"
+            .to_string(),
+        "python" => "- Write comprehensive tests covering edge cases:\n\
+              * Base cases and boundary values\n\
+              * Empty inputs, None values\n\
+              * Error conditions and exceptions\n\
+            - Use descriptive test names following test_<what>_<condition>_<expected> pattern:\n\
+              * Good: test_fibonacci_with_zero_returns_zero\n\
+              * Bad: test1, test_fib\n\
+            - Use pytest fixtures for setup and teardown\n\
+            - Use pytest.mark.parametrize for testing multiple inputs\n\
+            - Test both positive and negative cases\n\
+            - Use pytest.raises for exception testing\n\
+            - Include both unit tests and integration tests\n"
+            .to_string(),
+        _ => "- Write comprehensive tests covering edge cases\n\
+            - Use descriptive test names\n\
+            - Test both success and failure paths\n"
+            .to_string(),
+    }
 }
 
 #[instrument]
